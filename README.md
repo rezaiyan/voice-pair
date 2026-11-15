@@ -109,6 +109,7 @@ Some things you could say:
 - "Run the tests and tell me what fails."
 - "Open the auth middleware and explain the token check."
 - "Rename this variable to user ID in the whole file."
+- "Explain more." (switches to detailed voice mode, see below)
 - "Stop listening." (turns the microphone off)
 
 ### What Claude says back
@@ -123,6 +124,30 @@ Claude talks in short sentences, and the details stay on the screen:
 
 The microphone is off while Claude is speaking, so it doesn't hear itself. Wait until it stops,
 then talk. To make it stop early, run `voice-pair stop` in another terminal.
+
+### More detail by voice
+
+By default Claude keeps its speech short and leaves the details on the screen. If you want to work
+without looking at the screen, switch to detailed mode. Just say "explain more", "talk more" or
+"I'm not looking at the screen". To go back, say "keep it short".
+
+In detailed mode Claude:
+
+- explains what it found and why, step by step
+- describes code in words ("it takes the user ID, looks up the session, and fails if the token
+  expired") instead of reading symbols
+- tells you what it changed as a short list
+- says the options out loud when it needs a decision, and which one it recommends
+- reads a longer summary at the end if it finished without speaking
+
+It still doesn't read code, long paths or command output word for word. Those don't work well as
+speech, so Claude tells you what they mean instead.
+
+To start a session in detailed mode, use `VOICE_PAIR_DETAIL=full voice-pair`. `voice-pair status`
+shows the current mode.
+
+Long answers are harder to stop. If you use headphones, `VOICE_PAIR_BARGE_IN=1` lets you interrupt
+Claude by talking. Without headphones, use `voice-pair stop`.
 
 ### Typing and talking
 
@@ -153,6 +178,7 @@ Set these as environment variables before `voice-pair`, for example
 
 | Variable | Default | What it does |
 |---|---|---|
+| `VOICE_PAIR_DETAIL` | `brief` | Set to `full` to start in detailed voice mode. You can also switch by voice. |
 | `VOICE_PAIR_SPEED` | `1.0` | How fast Claude talks. Lower is slower. |
 | `VOICE_PAIR_END_SILENCE_MS` | `1300` | How long a pause (in ms) sends your message. Raise it if you get cut off. |
 | `VOICE_PAIR_VAD_LEVEL` | `2` | How strict the speech detection is, from 0 to 3. Raise it in a noisy room. |
@@ -218,7 +244,7 @@ button in the Security tab, not in a public issue.
 | Part | File | What it does |
 |---|---|---|
 | Launcher | `bin/voice-pair` | Makes sure the voice server is available (the plugin ships it; a git clone registers it for your project), adds the hooks and tool permissions for this one session, and starts `claude`. |
-| Channel server | `server/index.ts` | An MCP server that sends what you said into the session and gives Claude the `speak` and `set_listening` tools. |
+| Channel server | `server/index.ts` | An MCP server that sends what you said into the session and gives Claude the `speak`, `set_voice_detail` and `set_listening` tools. |
 | Turn logic | `server/state.ts` | Decides when to speak. If you asked by voice and Claude finished without speaking, it reads a short summary of the answer. |
 | Audio process | `audio/sidecar.py` | Listens to the microphone, finds where you start and stop talking (webrtcvad), turns speech into text (Parakeet), and plays Claude's voice (Kokoro). The microphone is ignored while Claude is speaking. |
 | Hook helper | `hooks/forward.ts` | Passes Claude Code hook events to the server. |
