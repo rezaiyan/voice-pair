@@ -10,7 +10,8 @@
 # Env: VOICE_PAIR_TTS=kokoro|say  VOICE_PAIR_VOICE=af_heart  VOICE_PAIR_SPEED=1.0
 #      VOICE_PAIR_BARGE_IN=1 (headphones: talking interrupts playback)  VOICE_PAIR_CUES=0
 #      VOICE_PAIR_START_MUTED=1  VOICE_PAIR_END_SILENCE_MS=1300  VOICE_PAIR_PORT=7788
-#      VOICE_PAIR_LOG_TRANSCRIPTS=1 (keep what you said in the log)  VOICE_PAIR_ALLOW_BYPASS=1
+#      VOICE_PAIR_DETAIL=full (explain everything by voice)  VOICE_PAIR_ALLOW_BYPASS=1
+#      VOICE_PAIR_LOG_TRANSCRIPTS=1 (keep what you said in the log)
 set -euo pipefail
 
 src="${BASH_SOURCE[0]}"
@@ -86,7 +87,7 @@ case "${1:-}" in
   link) link; exit ;;
   check) cd "$ROOT/audio" && exec .venv/bin/python check.py ;;
   status|mute|unmute|stop) control "$1"; exit ;;
-  -h|--help|help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit ;;
+  -h|--help|help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit ;;
 esac
 
 need claude "install Claude Code"
@@ -172,7 +173,7 @@ export VOICE_PAIR_SESSION="$ROOT"
 
 SETTINGS="$(jq -nc --arg bun "$BUN" --arg fwd "$ROOT/hooks/forward.ts" --arg tools "$TOOLS" '
   def h(ev): [{hooks: [{type: "command", command: (($bun|@sh) + " " + ($fwd|@sh) + " " + ev), async: true}]}];
-  {permissions: {allow: [($tools + "__speak"), ($tools + "__set_listening")]},
+  {permissions: {allow: [($tools + "__speak"), ($tools + "__set_listening"), ($tools + "__set_voice_detail")]},
    hooks: {Stop: h("stop"), UserPromptSubmit: h("prompt"), Notification: h("notification")}}')"
 
 # Remove this session's port/token files when claude exits (only if a newer session hasn't replaced them).

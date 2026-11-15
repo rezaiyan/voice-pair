@@ -46,3 +46,11 @@ def test_summary_should_cut_one_giant_sentence_at_word_boundary():
     out = summary("word " * 400, max_chars=50)
     assert 0 < len(out) <= 101
     assert out.endswith(".")
+
+
+def test_summary_keeps_more_sentences_with_a_bigger_limit():
+    text = " ".join(f"Step {i} changed the parser in a small way." for i in range(1, 21))
+    short = summary(text)
+    long = summary(text, max_chars=1200)
+    assert len(short) <= 280
+    assert len(long) > 3 * len(short)

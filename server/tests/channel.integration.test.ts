@@ -116,7 +116,11 @@ describe("voice-pair channel server", () => {
 
   it("should expose speak and set_listening tools", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["set_listening", "speak"]);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      "set_listening",
+      "set_voice_detail",
+      "speak",
+    ]);
   });
 
   it("should mark its tools to load upfront (not deferred behind tool search)", async () => {
@@ -154,6 +158,36 @@ describe("voice-pair channel server", () => {
       "fallback speak",
     );
     expect(cmd.summarize).toBe(true);
+    expect(cmd.max_chars).toBe(280);
+  });
+
+  it("should switch to full detail and read longer summaries", async () => {
+    const res = await client.callTool({
+      name: "set_voice_detail",
+      arguments: { level: "full" },
+    });
+    expect(res.isError).toBeFalsy();
+    expect(await status()).toMatchObject({ detail: "full" });
+    // A new voice turn (speech heard, no speak call) ends: the fallback summary is longer now.
+    await post("/hook/prompt", { prompt: "run the unit tests" });
+    expect(
+      await post("/hook/stop", { last_assistant_message: "Long answer here." }),
+    ).toBe("spoken");
+    const cmd = await until(
+      () => commands().find((c) => c.text === "Long answer here."),
+      "full summary",
+    );
+    expect(cmd.max_chars).toBe(1200);
+    await client.callTool({ name: "set_voice_detail", arguments: { level: "brief" } });
+    expect(await status()).toMatchObject({ detail: "brief" });
+  });
+
+  it("should reject an unknown detail level", async () => {
+    const res = await client.callTool({
+      name: "set_voice_detail",
+      arguments: { level: "loud" },
+    });
+    expect(res.isError).toBe(true);
   });
 
   it("should deliver Stop hook payloads through the hook shim", async () => {

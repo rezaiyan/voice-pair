@@ -1,7 +1,7 @@
 """voice-pair audio sidecar.
 
 Spawned by the channel server. Talks JSON lines:
-  stdin  <- {"cmd": "speak", "text": str, "summarize": bool} | {"cmd": "stop"|"mute"|"unmute"|"shutdown"}
+  stdin  <- {"cmd": "speak", "text": str, "summarize": bool, "max_chars": int} | {"cmd": "stop"|"mute"|"unmute"|"shutdown"}
   stdout -> {"event": "ready"|"hearing"|"transcript"|"dropped"|"speaking"|"muted"|"error", ...}
 Diagnostics go to stderr.
 """
@@ -142,7 +142,7 @@ class Sidecar:
         if cmd == "speak":
             text = str(msg.get("text", ""))
             if msg.get("summarize"):
-                text = speech_text.summary(text)
+                text = speech_text.summary(text, max_chars=int(msg.get("max_chars") or 280))
             if text.strip():
                 self.speaker.say(text)
         elif cmd == "stop":

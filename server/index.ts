@@ -12,31 +12,20 @@ import {
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { rejectRequest } from "./auth.ts";
+import { instructions, parseDetail, SUMMARY_CHARS } from "./instructions.ts";
 import { Sidecar, log, said, type SidecarEvent } from "./sidecar.ts";
 import { VoiceState, type HookEvent } from "./state.ts";
 
 const AUDIO_DIR = join(import.meta.dir, "..", "audio");
 const PORT = Number(process.env.VOICE_PAIR_PORT ?? 7788);
 
-const INSTRUCTIONS = `You are pair programming with the user by voice. They talk; you hear them through this channel.
-
-Inbound: <channel source="voice-pair" kind="speech"> carries a live transcript of the user speaking. Treat it exactly like a message they typed. It comes from local speech recognition, so technical words may be misheard ("middle way" = middleware, "jason" = JSON); infer the intended term from the codebase. If a transcript is ambiguous in a way that matters, ask a short spoken question instead of guessing.
-
-Outbound: the user is listening, maybe not looking at the screen. Use the speak tool to talk to them:
-- Before starting work that takes more than a few seconds, speak a one-line acknowledgment of what you're about to do.
-- At real milestones (found the cause, tests failing/passing, need a decision), speak one short sentence.
-- At the end of a turn, speak a brief summary of the outcome, and the question if you need an answer.
-- A quick answer or small request gets exactly one speak call: the answer itself. Don't narrate that you spoke.
-Spoken text must sound like a colleague talking: 1-3 short sentences, plain words, no markdown, no code, no full file paths or long identifiers (say "the auth middleware", not a path). Never read out diffs, tables or command output. Keep all detail (code, diffs, paths, lists) in your normal chat text as usual; speech is the summary, chat is the record.
-If the user asks you to stop listening or mute, call set_listening with listening=false. Don't call speak for turns that came from typed input unless the user asked you to talk.`;
-
-const state = new VoiceState();
+const state = new VoiceState(parseDetail(process.env.VOICE_PAIR_DETAIL));
 
 const mcp = new Server(
-  { name: "voice-pair", version: "0.2.0" },
+  { name: "voice-pair", version: "0.3.0" },
   {
     capabilities: { experimental: { "claude/channel": {} }, tools: {} },
-    instructions: INSTRUCTIONS,
+    instructions: instructions(state.detail),
   },
 );
 
@@ -46,7 +35,11 @@ const sidecarCmd = process.env.VOICE_PAIR_SIDECAR?.trim().split(/\s+/);
 const sidecar = new Sidecar(AUDIO_DIR, onSidecarEvent, sidecarCmd);
 
 function speak(text: string, summarize = false): boolean {
-  return sidecar.send({ cmd: "speak", text, summarize });
+  return sidecar.send(
+    summarize
+      ? { cmd: "speak", text, summarize, max_chars: SUMMARY_CHARS[state.detail] }
+      : { cmd: "speak", text },
+  );
 }
 
 async function onSidecarEvent(ev: SidecarEvent): Promise<void> {
@@ -81,7 +74,7 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
       // Load upfront: Claude must be able to talk without a tool-search round trip.
       _meta: { "anthropic/alwaysLoad": true },
       description:
-        "Say something out loud to the user (text-to-speech on their machine). Returns immediately; speech plays in the background. Use 1-3 short plain sentences, no markdown or code.",
+        "Say something out loud to the user (text-to-speech on their machine). Returns immediately; speech plays in the background and calls are queued in order. Plain spoken language, no markdown or code. Length follows the current detail level: 1-3 short sentences in brief mode, 2-5 sentences per call in full mode.",
       inputSchema: {
         type: "object",
         properties: {
@@ -91,6 +84,17 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
         },
         required: ["text"],
+      },
+    },
+    {
+      name: "set_voice_detail",
+      _meta: { "anthropic/alwaysLoad": true },
+      description:
+        'Change how much you explain out loud. "brief": short spoken summaries, details stay on screen. "full": explain everything by voice (the user may not look at the screen). Use when the user asks for more or less spoken detail.',
+      inputSchema: {
+        type: "object",
+        properties: { level: { type: "string", enum: ["brief", "full"] } },
+        required: ["level"],
       },
     },
     {
@@ -125,6 +129,27 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       };
     state.onSpeak();
     return { content: [{ type: "text", text: "speaking" }] };
+  }
+  if (req.params.name === "set_voice_detail") {
+    const level = args.level;
+    if (level !== "brief" && level !== "full")
+      return {
+        content: [{ type: "text", text: 'level must be "brief" or "full"' }],
+        isError: true,
+      };
+    state.detail = level;
+    log(`voice detail: ${level}`);
+    return {
+      content: [
+        {
+          type: "text",
+          text:
+            level === "full"
+              ? "Full mode on: explain everything by voice from now on."
+              : "Brief mode on: keep speech short; details stay on screen.",
+        },
+      ],
+    };
   }
   if (req.params.name === "set_listening") {
     const on = args.listening === true;
@@ -166,6 +191,7 @@ function startHttp(port: number, token: string) {
           speaking: sidecar.speaking,
           muted: sidecar.muted,
           voiceMode: state.voiceMode,
+          detail: state.detail,
         });
       }
       if (req.method !== "POST")
@@ -214,7 +240,7 @@ if (import.meta.main && !isActive) {
   // Not started by this install's bin/voice-pair (plain `claude`, or another install's session):
   // stay an inert MCP server (no channel, no tools, no mic) until Claude Code exits.
   const idle = new Server(
-    { name: "voice-pair", version: "0.2.0" },
+    { name: "voice-pair", version: "0.3.0" },
     { capabilities: {} },
   );
   await idle.connect(new StdioServerTransport());

@@ -21,7 +21,7 @@ export type SidecarEvent =
   | { event: "error"; message: string; fatal?: boolean };
 
 export type SidecarCommand =
-  | { cmd: "speak"; text: string; summarize?: boolean }
+  | { cmd: "speak"; text: string; summarize?: boolean; max_chars?: number }
   | { cmd: "stop" }
   | { cmd: "mute" }
   | { cmd: "unmute" }

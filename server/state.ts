@@ -4,9 +4,13 @@
 // a turn that ended without Claude calling the speak tool gets a spoken summary of its final
 // message (from the Stop hook), so a voice question never ends in silence.
 
+import type { Detail } from "./instructions.ts";
+
 export type HookEvent = Record<string, unknown>;
 
 export class VoiceState {
+  constructor(public detail: Detail = "brief") {}
+
   voiceMode = false;
   spokeInTurn = false;
   private recent: string[] = [];
