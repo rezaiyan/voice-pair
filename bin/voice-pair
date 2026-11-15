@@ -5,6 +5,7 @@
 #   voice-pair setup              install audio deps + download local speech models
 #   voice-pair check              test mic -> transcription -> voice output (run in your terminal)
 #   voice-pair status|mute|unmute|stop   control the running session (stop = shut up now)
+#   voice-pair link               plugin installs: put a `voice-pair` command on your PATH
 #
 # Env: VOICE_PAIR_TTS=kokoro|say  VOICE_PAIR_VOICE=af_heart  VOICE_PAIR_SPEED=1.0
 #      VOICE_PAIR_BARGE_IN=1 (headphones: talking interrupts playback)  VOICE_PAIR_CUES=0
@@ -22,6 +23,14 @@ ROOT="$(cd -P "$(dirname "$src")/.." && pwd)"
 CACHE="${VOICE_PAIR_CACHE:-$HOME/.cache/voice-pair}"
 PORT_FILE="$CACHE/port"
 TOKEN_FILE="$CACHE/token"
+
+# Two ways to install: a git checkout (registers the server per project with `claude mcp add`), or
+# the Claude Code plugin (the plugin ships the server itself). This folder is a plugin install when
+# Claude Code's plugin list has a voice-pair plugin installed here.
+PLUGIN_ID="$(jq -r --arg root "$ROOT" '.plugins // {} | to_entries[]
+  | select(.key | startswith("voice-pair@")) | select(any(.value[]; .installPath == $root)) | .key' \
+  "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null | head -1 || true)"
+if [ -n "$PLUGIN_ID" ]; then MODE=plugin; else MODE=checkout; fi
 
 die() { echo "voice-pair: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "$1 not found ($2)"; }
@@ -47,20 +56,53 @@ setup() {
   echo "voice-pair ready. Run: voice-pair   (from a project folder)"
 }
 
+# Plugin installs move to a new folder on every update, so the PATH command is a small script that
+# looks up the current install instead of a link to one version.
+link() {
+  [ "$MODE" = plugin ] || die "link is for plugin installs; for a git checkout, link bin/voice-pair yourself"
+  local dir target
+  for dir in /opt/homebrew/bin "$HOME/.local/bin" "$HOME/bin"; do
+    [ -d "$dir" ] && [ -w "$dir" ] && [[ ":$PATH:" == *":$dir:"* ]] && break
+    dir=""
+  done
+  [ -n "$dir" ] || die "no writable folder on your PATH (tried /opt/homebrew/bin, ~/.local/bin, ~/bin)"
+  target="$dir/voice-pair"
+  if [ -e "$target" ] && ! grep -q "voice-pair plugin shim" "$target" 2>/dev/null; then
+    die "$target already exists and is not from the plugin; remove it first"
+  fi
+  cat > "$target" <<SHIM
+#!/usr/bin/env bash
+# voice-pair plugin shim: runs the launcher of the currently installed voice-pair plugin.
+p="\$(jq -r '.plugins["$PLUGIN_ID"][0].installPath // empty' "\$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null)"
+[ -x "\$p/bin/voice-pair" ] || { echo "voice-pair: plugin not installed (in Claude Code: /plugin install $PLUGIN_ID)" >&2; exit 1; }
+exec "\$p/bin/voice-pair" "\$@"
+SHIM
+  chmod 755 "$target"
+  echo "voice-pair: added $target"
+}
+
 case "${1:-}" in
   setup) setup; exit ;;
+  link) link; exit ;;
   check) cd "$ROOT/audio" && exec .venv/bin/python check.py ;;
   status|mute|unmute|stop) control "$1"; exit ;;
-  -h|--help|help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit ;;
+  -h|--help|help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit ;;
 esac
 
 need claude "install Claude Code"
 need bun "curl -fsSL https://bun.sh/install | bash"
 need jq "brew install jq"
-[ -x "$ROOT/audio/.venv/bin/python" ] && [ -d "$ROOT/server/node_modules" ] \
-  && [ -f "$CACHE/kokoro-v1.0.onnx" ] && [ -f "$CACHE/voices-v1.0.bin" ] \
-  && (cd "$ROOT/audio" && .venv/bin/python -c "import models; models.stt_dir()" >/dev/null 2>&1) \
-  || die "not set up yet — run: voice-pair setup"
+is_set_up() {
+  [ -x "$ROOT/audio/.venv/bin/python" ] && [ -d "$ROOT/server/node_modules" ] \
+    && [ -f "$CACHE/kokoro-v1.0.onnx" ] && [ -f "$CACHE/voices-v1.0.bin" ] \
+    && (cd "$ROOT/audio" && .venv/bin/python -c "import models; models.stt_dir()" >/dev/null 2>&1)
+}
+if ! is_set_up; then
+  # A plugin update lands in a fresh folder: rebuild it there (the models are already downloaded).
+  [ "$MODE" = plugin ] && [ -d "$CACHE" ] || die "not set up yet — run: voice-pair setup"
+  echo "voice-pair: new plugin version, setting it up..."
+  setup >/dev/null
+fi
 
 # One voice session at a time: two would both listen, and the control commands reach only one.
 if [ -f "$PORT_FILE" ] && [ -f "$TOKEN_FILE" ] && (control status) >/dev/null 2>&1; then
@@ -108,23 +150,29 @@ mkdir -p "$CACHE" && chmod 700 "$CACHE"
 chmod 600 "$PORT_FILE" "$TOKEN_FILE"
 
 BUN="$(command -v bun)"
-# Channels only attach to MCP servers from Claude Code's own config (not --mcp-config), so register
-# voice-pair for this project once (local scope: private, in ~/.claude.json). Outside a voice-pair
-# launch the server sees no VOICE_PAIR_SESSION and stays inert: no channel, no tools, no mic.
-# If voice-pair was moved or reinstalled elsewhere, the old registration points at a missing file: redo it.
-reg="$(claude mcp get voice-pair 2>/dev/null || true)"
-if [[ $reg != *"$ROOT/server/index.ts"* ]]; then
-  claude mcp remove voice-pair -s local >/dev/null 2>&1 || true
-  claude mcp add --scope local voice-pair -- "$BUN" "$ROOT/server/index.ts" >/dev/null \
-    || die "could not register voice-pair with Claude Code (claude mcp add failed)"
-  echo "voice-pair: registered for $(pwd) (local scope; remove with: claude mcp remove voice-pair -s local)"
+if [ "$MODE" = checkout ]; then
+  # Channels only attach to MCP servers from Claude Code's own config (not --mcp-config), so register
+  # this checkout's server for the project (local scope: private, in ~/.claude.json). If voice-pair
+  # was moved, the old registration points at a missing file: redo it.
+  reg="$(claude mcp get voice-pair 2>/dev/null || true)"
+  if [[ $reg != *"$ROOT/server/index.ts"* ]]; then
+    claude mcp remove voice-pair -s local >/dev/null 2>&1 || true
+    claude mcp add --scope local voice-pair -- "$BUN" "$ROOT/server/index.ts" >/dev/null \
+      || die "could not register voice-pair with Claude Code (claude mcp add failed)"
+    echo "voice-pair: registered for $(pwd) (local scope; remove with: claude mcp remove voice-pair -s local)"
+  fi
+  CHANNEL="server:voice-pair"
+  TOOLS="mcp__voice-pair"
+else
+  CHANNEL="plugin:$PLUGIN_ID"
+  TOOLS="mcp__plugin_${PLUGIN_ID%@*}_voice-pair"
 fi
-export VOICE_PAIR_SESSION=1
+# Only the server from this install folder comes alive; any other voice-pair server stays inert.
+export VOICE_PAIR_SESSION="$ROOT"
 
-# Hook commands run through a shell: quote the paths (an install path may contain spaces).
-SETTINGS="$(jq -nc --arg bun "$BUN" --arg fwd "$ROOT/hooks/forward.ts" '
+SETTINGS="$(jq -nc --arg bun "$BUN" --arg fwd "$ROOT/hooks/forward.ts" --arg tools "$TOOLS" '
   def h(ev): [{hooks: [{type: "command", command: (($bun|@sh) + " " + ($fwd|@sh) + " " + ev), async: true}]}];
-  {permissions: {allow: ["mcp__voice-pair__speak", "mcp__voice-pair__set_listening"]},
+  {permissions: {allow: [($tools + "__speak"), ($tools + "__set_listening")]},
    hooks: {Stop: h("stop"), UserPromptSubmit: h("prompt"), Notification: h("notification")}}')"
 
 # Remove this session's port/token files when claude exits (only if a newer session hasn't replaced them).
@@ -136,4 +184,4 @@ trap cleanup EXIT
 trap : INT  # Ctrl+C belongs to claude; keep waiting for it to exit
 
 echo "voice-pair: starting (control port $port). First launch loads speech models (~3s); then just talk."
-claude --dangerously-load-development-channels server:voice-pair --settings "$SETTINGS" "$@"
+claude --dangerously-load-development-channels "$CHANNEL" --settings "$SETTINGS" "$@"

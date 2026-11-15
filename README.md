@@ -23,6 +23,27 @@ curl -fsSL https://bun.sh/install | bash
 
 ## Install
 
+You can install voice-pair as a Claude Code plugin, or from a git clone. Both work the same way
+after setup.
+
+### As a plugin
+
+In Claude Code, run:
+
+```
+/plugin marketplace add rezaiyan/claude-plugins
+/plugin install voice-pair@rezaiyan
+/voice-pair:setup
+```
+
+`/voice-pair:setup` prepares everything and adds a `voice-pair` command to your PATH. When the
+plugin gets an update, the next `voice-pair` start sets up the new version by itself.
+
+With the plugin installed, every Claude Code session starts a small voice-pair process. It does
+nothing (no microphone, no tools) unless you started the session with `voice-pair`.
+
+### From a git clone
+
 ```bash
 git clone https://github.com/rezaiyan/voice-pair.git ~/voice-pair
 ln -s ~/voice-pair/bin/voice-pair /opt/homebrew/bin/voice-pair
@@ -32,9 +53,12 @@ voice-pair setup
 The second line puts the `voice-pair` command on your PATH. You can link it into any other folder
 on your PATH instead.
 
-`setup` creates a Python environment, installs the Bun packages and downloads the speech models
-(about 2.7 GB, so the first run takes a while). It checks every model file against a fixed SHA-256
-hash. You only need to run it once.
+### What setup does
+
+Setup creates a Python environment, installs the Bun packages and downloads the speech models
+(about 2.7 GB, so the first run takes a few minutes). It checks every model file against a fixed
+SHA-256 hash. A warning from Hugging Face about `HF_TOKEN` during the download is normal. You only
+need to run setup once.
 
 Then test your microphone:
 
@@ -146,20 +170,24 @@ button in the Security tab, not in a public issue.
 
 | Part | File | What it does |
 |---|---|---|
-| Launcher | `bin/voice-pair` | Registers the voice server for your project, adds the hooks and tool permissions for this one session, and starts `claude`. |
+| Launcher | `bin/voice-pair` | Makes sure the voice server is available (the plugin ships it; a git clone registers it for your project), adds the hooks and tool permissions for this one session, and starts `claude`. |
 | Channel server | `server/index.ts` | An MCP server that sends what you said into the session and gives Claude the `speak` and `set_listening` tools. |
 | Turn logic | `server/state.ts` | Decides when to speak. If you asked by voice and Claude finished without speaking, it reads a short summary of the answer. |
 | Audio process | `audio/sidecar.py` | Listens to the microphone, finds where you start and stop talking (webrtcvad), turns speech into text (Parakeet), and plays Claude's voice (Kokoro). The microphone is ignored while Claude is speaking. |
 | Hook helper | `hooks/forward.ts` | Passes Claude Code hook events to the server. |
 
-The launcher registers the server in your Claude Code settings for that project only. If you start
-plain `claude` in the same project, the server does nothing: no microphone, no tools.
+The voice server only comes alive in a session started with `voice-pair`. In a plain `claude`
+session it does nothing: no microphone, no tools.
 
-To remove voice-pair from a project:
+To remove voice-pair:
 
-```bash
-claude mcp remove voice-pair -s local
-```
+- Plugin: run `/plugin uninstall voice-pair@rezaiyan` in Claude Code, and delete the
+  `voice-pair` command that setup added (it tells you where).
+- Git clone: with a git clone, the launcher registers the server for each project where you use
+  it. Remove it there with `claude mcp remove voice-pair -s local`.
+
+The models stay on disk: delete `~/.cache/voice-pair` and
+`~/.cache/huggingface/hub/models--mlx-community--parakeet-tdt-0.6b-v3` to get the space back.
 
 On an M2 Max, turning 5 seconds of speech into text takes about 150 ms. Claude's voice starts
 about 0.9 seconds after it calls `speak`.

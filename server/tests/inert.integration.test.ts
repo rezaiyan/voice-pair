@@ -33,3 +33,29 @@ describe("voice-pair outside a voice session", () => {
     await client.close();
   });
 });
+
+describe("voice-pair with two installs", () => {
+  it("should stay inert when the session belongs to another install", async () => {
+    const env = { ...(process.env as Record<string, string>) };
+    const dir = mkdtempSync(join(tmpdir(), "voice-pair-other-"));
+    const marker = join(dir, "sidecar-ran");
+    const client = new Client({ name: "test-host", version: "0" });
+    await client.connect(
+      new StdioClientTransport({
+        command: "bun",
+        args: [join(import.meta.dir, "..", "index.ts")],
+        env: {
+          ...env,
+          VOICE_PAIR_SESSION: dir, // some other voice-pair folder
+          VOICE_PAIR_SIDECAR: `touch ${marker}`,
+          VOICE_PAIR_PORT: "1",
+        },
+        stderr: "ignore",
+      }),
+    );
+    expect(client.getServerCapabilities()?.experimental).toBeUndefined();
+    await Bun.sleep(300);
+    expect(existsSync(marker)).toBe(false);
+    await client.close();
+  });
+});

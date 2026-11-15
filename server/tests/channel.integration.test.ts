@@ -73,7 +73,7 @@ beforeAll(async () => {
       env: {
         ...(process.env as Record<string, string>),
         VOICE_PAIR_PORT: PORT,
-        VOICE_PAIR_SESSION: "1",
+        VOICE_PAIR_SESSION: join(import.meta.dir, "..", ".."),
         VOICE_PAIR_TOKEN: TOKEN,
         VOICE_PAIR_SIDECAR: `bun ${join(import.meta.dir, "fake-sidecar.ts")}`,
         VOICE_PAIR_CACHE: dir,

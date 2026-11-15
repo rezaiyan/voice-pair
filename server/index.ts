@@ -9,6 +9,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { rejectRequest } from "./auth.ts";
 import { Sidecar, log, said, type SidecarEvent } from "./sidecar.ts";
@@ -32,7 +33,7 @@ If the user asks you to stop listening or mute, call set_listening with listenin
 const state = new VoiceState();
 
 const mcp = new Server(
-  { name: "voice-pair", version: "0.1.0" },
+  { name: "voice-pair", version: "0.2.0" },
   {
     capabilities: { experimental: { "claude/channel": {} }, tools: {} },
     instructions: INSTRUCTIONS,
@@ -201,11 +202,19 @@ function startHttp(port: number, token: string) {
 }
 
 // ---- main ----------------------------------------------------------------------------------
-if (import.meta.main && process.env.VOICE_PAIR_SESSION !== "1") {
-  // Registered for this project but the session wasn't started by bin/voice-pair:
+// bin/voice-pair sets VOICE_PAIR_SESSION to the install folder it belongs to. Only the server from
+// that same folder comes alive, so a git checkout and the plugin can both be installed without two
+// servers opening the microphone.
+const ROOT = realpathSync(join(import.meta.dir, ".."));
+const activeRoot = process.env.VOICE_PAIR_SESSION;
+const isActive =
+  !!activeRoot && existsSync(activeRoot) && realpathSync(activeRoot) === ROOT;
+
+if (import.meta.main && !isActive) {
+  // Not started by this install's bin/voice-pair (plain `claude`, or another install's session):
   // stay an inert MCP server (no channel, no tools, no mic) until Claude Code exits.
   const idle = new Server(
-    { name: "voice-pair", version: "0.1.0" },
+    { name: "voice-pair", version: "0.2.0" },
     { capabilities: {} },
   );
   await idle.connect(new StdioServerTransport());
