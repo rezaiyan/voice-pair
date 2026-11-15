@@ -1,0 +1,14 @@
+{
+  "name": "voice-pair-server",
+  "private": true,
+  "type": "module",
+  "description": "Claude Code channel server for voice-pair: speech in, speak tool out",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "typescript": "5.9.3"
+  }
+}

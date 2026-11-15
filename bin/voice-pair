@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# voice-pair — talk to Claude Code out loud; it talks back.
+#
+#   voice-pair [claude args...]   start a voice session in the current folder
+#   voice-pair setup              install audio deps + download local speech models
+#   voice-pair check              test mic -> transcription -> voice output (run in your terminal)
+#   voice-pair status|mute|unmute|stop   control the running session (stop = shut up now)
+#
+# Env: VOICE_PAIR_TTS=kokoro|say  VOICE_PAIR_VOICE=af_heart  VOICE_PAIR_SPEED=1.0
+#      VOICE_PAIR_BARGE_IN=1 (headphones: talking interrupts playback)  VOICE_PAIR_CUES=0
+#      VOICE_PAIR_START_MUTED=1  VOICE_PAIR_END_SILENCE_MS=1300  VOICE_PAIR_PORT=7788
+#      VOICE_PAIR_LOG_TRANSCRIPTS=1 (keep what you said in the log)  VOICE_PAIR_ALLOW_BYPASS=1
+set -euo pipefail
+
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  [[ $src != /* ]] && src="$dir/$src"
+done
+ROOT="$(cd -P "$(dirname "$src")/.." && pwd)"
+CACHE="${VOICE_PAIR_CACHE:-$HOME/.cache/voice-pair}"
+PORT_FILE="$CACHE/port"
+TOKEN_FILE="$CACHE/token"
+
+die() { echo "voice-pair: $*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "$1 not found ($2)"; }
+
+control() {
+  [ -f "$PORT_FILE" ] && [ -f "$TOKEN_FILE" ] || die "no running session"
+  local port; port="$(cat "$PORT_FILE")"
+  # Token goes in via curl's config on stdin, never on the command line (visible in ps).
+  local cfg; cfg="header = \"x-voice-pair-token: $(cat "$TOKEN_FILE")\""
+  if [ "$1" = status ]; then
+    curl -fsS -K - "http://127.0.0.1:$port/status" <<<"$cfg" 2>/dev/null && echo || die "no session running on port $port"
+  else
+    curl -fsS -K - -X POST "http://127.0.0.1:$port/$1" <<<"$cfg" >/dev/null 2>&1 && echo "$1: ok" || die "no session running on port $port"
+  fi
+}
+
+setup() {
+  need uv "brew install uv"
+  need bun "curl -fsSL https://bun.sh/install | bash"
+  (cd "$ROOT/audio" && uv sync --python 3.12)
+  (cd "$ROOT/server" && bun install --frozen-lockfile)
+  (cd "$ROOT/audio" && uv run python fetch_models.py)
+  echo "voice-pair ready. Run: voice-pair   (from a project folder)"
+}
+
+case "${1:-}" in
+  setup) setup; exit ;;
+  check) cd "$ROOT/audio" && exec .venv/bin/python check.py ;;
+  status|mute|unmute|stop) control "$1"; exit ;;
+  -h|--help|help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit ;;
+esac
+
+need claude "install Claude Code"
+need bun "curl -fsSL https://bun.sh/install | bash"
+need jq "brew install jq"
+[ -x "$ROOT/audio/.venv/bin/python" ] && [ -d "$ROOT/server/node_modules" ] \
+  && [ -f "$CACHE/kokoro-v1.0.onnx" ] && [ -f "$CACHE/voices-v1.0.bin" ] \
+  && (cd "$ROOT/audio" && .venv/bin/python -c "import models; models.stt_dir()" >/dev/null 2>&1) \
+  || die "not set up yet — run: voice-pair setup"
+
+# One voice session at a time: two would both listen, and the control commands reach only one.
+if [ -f "$PORT_FILE" ] && [ -f "$TOKEN_FILE" ] && (control status) >/dev/null 2>&1; then
+  die "another voice-pair session is already running (port $(cat "$PORT_FILE")). Quit it first."
+fi
+
+# Anything the mic hears becomes a prompt. With permission checks off, a voice from a video or
+# someone nearby could make Claude run commands with no confirmation. Make that a deliberate choice.
+bypass=""
+prev=""
+for a in "$@"; do
+  case "$a" in
+    --dangerously-skip-permissions|--permission-mode=bypassPermissions) bypass="$a" ;;
+    bypassPermissions) [ "$prev" = "--permission-mode" ] && bypass="--permission-mode bypassPermissions" ;;
+  esac
+  prev="$a"
+done
+for f in "$HOME/.claude/settings.json" .claude/settings.json .claude/settings.local.json; do
+  [ -z "$bypass" ] && [ -f "$f" ] && [ "$(jq -r '.permissions.defaultMode // empty' "$f" 2>/dev/null)" = bypassPermissions ] \
+    && bypass="defaultMode bypassPermissions in $f"
+done
+if [ -n "$bypass" ] && [ "${VOICE_PAIR_ALLOW_BYPASS:-}" != 1 ]; then
+  cat >&2 <<EOF
+voice-pair: WARNING — permission checks are off ($bypass).
+  Everything the microphone picks up is sent to Claude as a prompt: a video playing, a call,
+  someone else in the room. With permissions bypassed, Claude would act on it without asking.
+EOF
+  [ -t 0 ] || die "refusing to start without a terminal to confirm (set VOICE_PAIR_ALLOW_BYPASS=1 to override)"
+  read -r -p "  Type 'yes' to start anyway: " answer
+  [ "$answer" = yes ] || die "not started"
+fi
+
+# Pick a free local control port (used by the hook shim to reach the server).
+port="${VOICE_PAIR_PORT:-7788}"
+port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+for _ in $(seq 1 20); do port_busy "$port" && port=$((port + 1)) || break; done
+port_busy "$port" && die "no free control port near ${VOICE_PAIR_PORT:-7788} (set VOICE_PAIR_PORT)"
+export VOICE_PAIR_PORT="$port"
+# Per-session secret for the control port: only the hook shim and `voice-pair status|mute|…` get it.
+VOICE_PAIR_TOKEN="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+export VOICE_PAIR_TOKEN
+# Private files, without changing the umask claude itself inherits.
+mkdir -p "$CACHE" && chmod 700 "$CACHE"
+(umask 077; echo "$port" > "$PORT_FILE"; echo "$VOICE_PAIR_TOKEN" > "$TOKEN_FILE")
+chmod 600 "$PORT_FILE" "$TOKEN_FILE"
+
+BUN="$(command -v bun)"
+# Channels only attach to MCP servers from Claude Code's own config (not --mcp-config), so register
+# voice-pair for this project once (local scope: private, in ~/.claude.json). Outside a voice-pair
+# launch the server sees no VOICE_PAIR_SESSION and stays inert: no channel, no tools, no mic.
+# If voice-pair was moved or reinstalled elsewhere, the old registration points at a missing file: redo it.
+reg="$(claude mcp get voice-pair 2>/dev/null || true)"
+if [[ $reg != *"$ROOT/server/index.ts"* ]]; then
+  claude mcp remove voice-pair -s local >/dev/null 2>&1 || true
+  claude mcp add --scope local voice-pair -- "$BUN" "$ROOT/server/index.ts" >/dev/null \
+    || die "could not register voice-pair with Claude Code (claude mcp add failed)"
+  echo "voice-pair: registered for $(pwd) (local scope; remove with: claude mcp remove voice-pair -s local)"
+fi
+export VOICE_PAIR_SESSION=1
+
+# Hook commands run through a shell: quote the paths (an install path may contain spaces).
+SETTINGS="$(jq -nc --arg bun "$BUN" --arg fwd "$ROOT/hooks/forward.ts" '
+  def h(ev): [{hooks: [{type: "command", command: (($bun|@sh) + " " + ($fwd|@sh) + " " + ev), async: true}]}];
+  {permissions: {allow: ["mcp__voice-pair__speak", "mcp__voice-pair__set_listening"]},
+   hooks: {Stop: h("stop"), UserPromptSubmit: h("prompt"), Notification: h("notification")}}')"
+
+# Remove this session's port/token files when claude exits (only if a newer session hasn't replaced them).
+cleanup() {
+  [ "$(cat "$TOKEN_FILE" 2>/dev/null)" = "$VOICE_PAIR_TOKEN" ] && rm -f "$PORT_FILE" "$TOKEN_FILE"
+  return 0
+}
+trap cleanup EXIT
+trap : INT  # Ctrl+C belongs to claude; keep waiting for it to exit
+
+echo "voice-pair: starting (control port $port). First launch loads speech models (~3s); then just talk."
+claude --dangerously-load-development-channels server:voice-pair --settings "$SETTINGS" "$@"

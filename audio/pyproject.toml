@@ -1,0 +1,22 @@
+[project]
+name = "voice-pair-audio"
+version = "0.1.0"
+description = "Audio sidecar for the voice-pair Claude Code channel: mic -> VAD -> STT, and TTS playback"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=1.26",
+    "sounddevice>=0.4.7",
+    "webrtcvad-wheels>=2.0.14",
+    "parakeet-mlx>=0.3",
+    "kokoro-onnx>=0.4",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "soundfile>=0.12"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
