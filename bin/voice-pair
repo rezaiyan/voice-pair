@@ -24,13 +24,14 @@ ROOT="$(cd -P "$(dirname "$src")/.." && pwd)"
 CACHE="${VOICE_PAIR_CACHE:-$HOME/.cache/voice-pair}"
 PORT_FILE="$CACHE/port"
 TOKEN_FILE="$CACHE/token"
+CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"   # Claude Code's own config folder
 
 # Two ways to install: a git checkout (registers the server per project with `claude mcp add`), or
 # the Claude Code plugin (the plugin ships the server itself). This folder is a plugin install when
 # Claude Code's plugin list has a voice-pair plugin installed here.
 PLUGIN_ID="$(jq -r --arg root "$ROOT" '.plugins // {} | to_entries[]
   | select(.key | startswith("voice-pair@")) | select(any(.value[]; .installPath == $root)) | .key' \
-  "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null | head -1 || true)"
+  "$CLAUDE_HOME/plugins/installed_plugins.json" 2>/dev/null | head -1 || true)"
 if [ -n "$PLUGIN_ID" ]; then MODE=plugin; else MODE=checkout; fi
 
 die() { echo "voice-pair: $*" >&2; exit 1; }
@@ -49,8 +50,11 @@ control() {
 }
 
 setup() {
+  [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ] \
+    || die "voice-pair needs a Mac with Apple Silicon (speech recognition runs on MLX)"
   need uv "brew install uv"
   need bun "curl -fsSL https://bun.sh/install | bash"
+  need jq "brew install jq"
   (cd "$ROOT/audio" && uv sync --python 3.12)
   (cd "$ROOT/server" && bun install --frozen-lockfile)
   (cd "$ROOT/audio" && uv run python fetch_models.py)
@@ -74,7 +78,8 @@ link() {
   cat > "$target" <<SHIM
 #!/usr/bin/env bash
 # voice-pair plugin shim: runs the launcher of the currently installed voice-pair plugin.
-p="\$(jq -r '.plugins["$PLUGIN_ID"][0].installPath // empty' "\$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null)"
+command -v jq >/dev/null || { echo "voice-pair: jq not found (brew install jq)" >&2; exit 1; }
+p="\$(jq -r '.plugins["$PLUGIN_ID"][0].installPath // empty' "\${CLAUDE_CONFIG_DIR:-\$HOME/.claude}/plugins/installed_plugins.json" 2>/dev/null)"
 [ -x "\$p/bin/voice-pair" ] || { echo "voice-pair: plugin not installed (in Claude Code: /plugin install $PLUGIN_ID)" >&2; exit 1; }
 exec "\$p/bin/voice-pair" "\$@"
 SHIM
@@ -121,7 +126,7 @@ for a in "$@"; do
   esac
   prev="$a"
 done
-for f in "$HOME/.claude/settings.json" .claude/settings.json .claude/settings.local.json; do
+for f in "$CLAUDE_HOME/settings.json" .claude/settings.json .claude/settings.local.json; do
   [ -z "$bypass" ] && [ -f "$f" ] && [ "$(jq -r '.permissions.defaultMode // empty' "$f" 2>/dev/null)" = bypassPermissions ] \
     && bypass="defaultMode bypassPermissions in $f"
 done
