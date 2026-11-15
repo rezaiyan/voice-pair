@@ -70,23 +70,70 @@ macOS will ask if your terminal app may use the microphone. Say yes. The check r
 shows what it heard, and reads it back to you. You need to do this once for each terminal app you
 use (Terminal, iTerm, Ghostty and so on).
 
-## Use
+## Use it with Claude Code
 
-Go to your project folder and start a session:
+### Start Claude with voice
+
+Run `voice-pair` where you would normally run `claude`. It starts Claude Code for you, with voice
+turned on:
 
 ```bash
 cd ~/code/my-app
-voice-pair
+voice-pair                      # instead of: claude
+voice-pair --model opus         # any claude option works
+voice-pair --continue           # for example, continue your last conversation
 ```
 
-Claude Code shows a warning about development channels. Choose "I am using this for local
-development". After about three seconds the speech models are loaded and you can start talking.
+Claude Code first shows a warning about development channels. This is normal for voice-pair.
+Choose "I am using this for local development" and press Enter. After about three seconds the
+speech models are ready. Now you have a normal Claude Code session that also listens to you.
 
-- Stop talking for about 1.3 seconds and voice-pair sends what you said.
-- Claude tells you what it is going to do, gives short updates on longer tasks, and sums up at the
-  end.
-- You can still type. When you type, Claude stops reading its answers aloud until you speak again.
-- Any `claude` options work, for example `voice-pair --model opus`.
+A plain `claude` session has no voice, even with voice-pair installed. Only sessions you start
+with `voice-pair` can hear you.
+
+### Talk to Claude
+
+Just speak, the way you would talk to a colleague. When you stop for about 1.3 seconds, a soft tick
+plays and your words are sent. In the terminal they show up as a message from voice-pair:
+
+```
+← voice-pair: Why does the login test fail?
+```
+
+Claude treats it exactly like a message you typed. It can read files, run commands and edit code
+as usual, and Claude Code still asks for your permission in the same way.
+
+Some things you could say:
+
+- "What does this project do?"
+- "Run the tests and tell me what fails."
+- "Open the auth middleware and explain the token check."
+- "Rename this variable to user ID in the whole file."
+- "Stop listening." (turns the microphone off)
+
+### What Claude says back
+
+Claude talks in short sentences, and the details stay on the screen:
+
+- For a quick question, it just says the answer.
+- For a longer task, it says what it is going to do, gives a short update when something
+  important happens, and sums up at the end.
+- Code, diffs, file paths and long lists are not read out. You see them in the terminal as usual.
+- When Claude needs your permission, it tells you, and you answer with the keyboard.
+
+The microphone is off while Claude is speaking, so it doesn't hear itself. Wait until it stops,
+then talk. To make it stop early, run `voice-pair stop` in another terminal.
+
+### Typing and talking
+
+You can mix both in one session. When you type a message, Claude answers on the screen only, as
+in a normal session. When you speak again, it starts talking again.
+
+### Stop the session
+
+End it like any Claude Code session: type `/exit`, or press Ctrl+C twice.
+
+### Control commands
 
 To control a running session, open a second terminal:
 
