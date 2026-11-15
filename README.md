@@ -6,6 +6,12 @@ terminal as usual. The voice part is short, like a colleague sitting next to you
 
 Speech recognition and the voice both run on your Mac. Your audio never leaves your computer.
 
+<p align="center">
+  <img src="media/demo.gif" width="720" alt="A Claude Code session by voice: the user asks why the Word Rush card stays locked after login, Claude explains out loud, changes the code, runs the tests, and the card unlocks on the phone" />
+</p>
+
+<p align="center"><sub>A real bug in the Lexicon app, fixed by voice. Claude speaks with voice-pair's default voice.</sub></p>
+
 ## What you need
 
 - A Mac with Apple Silicon (M1 or newer)
