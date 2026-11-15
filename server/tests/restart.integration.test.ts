@@ -16,7 +16,7 @@ it("should re-mute the microphone after the audio process restarts", async () =>
       args: [join(import.meta.dir, "..", "index.ts")],
       env: {
         ...(process.env as Record<string, string>),
-        VOICE_PAIR_SESSION: "1",
+        VOICE_PAIR_SESSION: join(import.meta.dir, "..", ".."),
         VOICE_PAIR_TOKEN: "t",
         VOICE_PAIR_PORT: String(19000 + Math.floor(Math.random() * 900)),
         VOICE_PAIR_SIDECAR: `bun ${join(import.meta.dir, "fake-sidecar.ts")}`,
