@@ -14,6 +14,9 @@ import type { Subprocess } from "bun";
 export type SidecarEvent =
   | { event: "ready"; tts: string; muted: boolean; barge_in: boolean }
   | { event: "hearing" }
+  | { event: "transcribing" }
+  | { event: "level"; value: number }
+  | { event: "bands"; source: "mic" | "voice"; values: number[] }
   | { event: "transcript"; text: string; stt_ms: number; audio_ms: number }
   | { event: "dropped"; reason: string; text?: string }
   | { event: "speaking"; value: boolean }
