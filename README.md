@@ -107,9 +107,7 @@ Claude talks in short sentences and leaves the details on screen:
 - Code, diffs, file paths and long lists stay on screen. They aren't read out.
 - When Claude needs your permission, it tells you, and you answer with the keyboard.
 
-The microphone is off while Claude speaks, so it doesn't hear itself. To make it stop early, run
-`voice-pair stop` in another terminal. With headphones, `VOICE_PAIR_BARGE_IN=1` lets you
-interrupt it by talking.
+The microphone is off while Claude speaks, so it doesn't hear itself.
 
 ### Control it from another terminal
 
@@ -140,13 +138,8 @@ Set these before the command, for example `VOICE_PAIR_SPEED=0.9 voice-pair`.
 | `VOICE_PAIR_BARGE_IN` | off | `1` lets you interrupt Claude by talking. Use headphones, or it hears itself. |
 | `VOICE_PAIR_CUES` | `1` | `0` turns off the tick when your message is sent. |
 | `VOICE_PAIR_BAND` | orb | `full` for the wide band with words and buttons, `0` for nothing above the prompt. |
-| `VOICE_PAIR_LOG_TRANSCRIPTS` | off | `1` saves what you said in the log, for debugging. |
 | `VOICE_PAIR_ALLOW_BYPASS` | off | `1` skips the question when permission checks are off. |
-| `VOICE_PAIR_PORT` | `7788` | First local port to try for the control commands. |
 | `VOICE_PAIR_CACHE` | `~/.cache/voice-pair` | Where models, the log and session files live. |
-| `VOICE_PAIR_STT_MODEL` | `mlx-community/parakeet-tdt-0.6b-v3` | A different Parakeet model. It isn't hash-checked. |
-| `VOICE_PAIR_STT_REVISION` | a fixed commit | Which version of the speech model to download. |
-| `VOICE_PAIR_SIDECAR` | none | Development only: run a different audio process (the tests use a fake one). |
 
 ## Security and privacy
 
@@ -184,26 +177,8 @@ vulnerability" button in the Security tab, not in a public issue.
 
 - It only works in the Claude Code terminal app. The desktop app can't use channels yet.
 - You can't interrupt Claude by voice while it's working. What you say is sent when it finishes.
-  `voice-pair stop` stops the talking right away.
 - Speech recognition sometimes gets technical words wrong ("jason" instead of JSON). Claude
   usually figures out what you meant from the code.
-
-## How it works
-
-| Part | File | What it does |
-|---|---|---|
-| Launcher | `bin/voice-pair` | Makes sure the voice server is there (the plugin ships it, a git clone registers it for your project), adds the hooks and tool permissions for this one session, and starts `claude`. |
-| Channel server | `server/index.ts` | An MCP server that sends what you said into the session and gives Claude the `speak`, `set_voice_detail` and `set_listening` tools. |
-| Turn logic | `server/state.ts` | Decides when to speak. If you asked by voice and Claude finished without speaking, it reads a short summary. |
-| Audio process | `audio/sidecar.py` | Listens to the microphone, finds where you start and stop talking (webrtcvad), turns speech into text (Parakeet) and plays Claude's voice (Kokoro). It ignores the microphone while Claude talks. |
-| Hook helper | `hooks/forward.ts` | Passes Claude Code hook events to the server. |
-| Voice orb | `band/` | A Claude Code mod that reads the server's live state (what the voice is doing, and the equalizer bands of the microphone or Claude's voice) about 25 times a second and draws the orb above the prompt. |
-
-With the plugin installed, every Claude Code session starts a small voice-pair server, but it
-does nothing (no microphone, no tools) unless you started the session with `voice-pair`.
-
-On an M2 Max, turning 5 seconds of speech into text takes about 150 ms, and Claude's voice starts
-about 0.9 seconds after it calls `speak`.
 
 ## Uninstall
 
@@ -237,5 +212,3 @@ bundled app, the GPL applies to that package. With `VOICE_PAIR_TTS=say` they are
 - Speech detection: [webrtcvad](https://github.com/wiseman/py-webrtcvad) (MIT), from the
   [webrtcvad-wheels](https://github.com/daanzu/py-webrtcvad-wheels) build.
 - Claude Code connection: [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) (MIT).
-
-The models aren't part of this repository. `voice-pair setup` downloads them.
