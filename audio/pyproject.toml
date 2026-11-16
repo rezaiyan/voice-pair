@@ -1,6 +1,6 @@
 [project]
 name = "voice-pair-audio"
-version = "0.3.1"
+version = "0.4.0"
 description = "Audio sidecar for the voice-pair Claude Code channel: mic -> VAD -> STT, and TTS playback"
 requires-python = ">=3.12,<3.13"
 dependencies = [
