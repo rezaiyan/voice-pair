@@ -1,8 +1,7 @@
 # voice-pair
 
-Talk to Claude Code instead of typing. You speak, your words go into the open Claude Code session
-as a normal message, and Claude answers you out loud. Code and details still show up in the
-terminal as usual. The voice part is short, like a colleague sitting next to you.
+Talk to Claude Code instead of typing. You speak, Claude answers out loud, and the code and
+details still show up in the terminal like always.
 
 Speech recognition and the voice both run on your Mac. Your audio never leaves your computer.
 
@@ -10,17 +9,14 @@ Speech recognition and the voice both run on your Mac. Your audio never leaves y
   <img src="media/demo.gif" width="720" alt="A Claude Code session by voice: the user asks why the Word Rush card stays locked after login, Claude explains out loud, changes the code, runs the tests, and the card unlocks on the phone" />
 </p>
 
-<p align="center"><sub>A real bug in the Lexicon app, fixed by voice. Claude speaks with voice-pair's default voice.</sub></p>
+<p align="center"><sub>A real bug in the Lexicon app, fixed by voice, with voice-pair's default voice.</sub></p>
 
 ## What you need
 
 - A Mac with Apple Silicon (M1 or newer)
-- Claude Code 2.1.285 or newer, used in the terminal (not the desktop app), and logged in with a
-  claude.ai account
+- Claude Code 2.1.285 or newer, in the terminal (not the desktop app), logged in with a claude.ai account
 - [Homebrew](https://brew.sh), [uv](https://docs.astral.sh/uv/), [Bun](https://bun.sh) and jq
 - About 2.7 GB of free disk space for the speech models
-
-If you are missing some of the tools:
 
 ```bash
 brew install uv jq
@@ -29,12 +25,9 @@ curl -fsSL https://bun.sh/install | bash
 
 ## Install
 
-You can install voice-pair as a Claude Code plugin, or from a git clone. Both work the same way
-after setup.
+Install it as a Claude Code plugin or from a git clone. Both work the same after setup.
 
-### As a plugin
-
-In Claude Code, run:
+**As a plugin.** In Claude Code, run:
 
 ```
 /plugin marketplace add rezaiyan/claude-plugins
@@ -42,29 +35,21 @@ In Claude Code, run:
 /voice-pair:setup
 ```
 
-`/voice-pair:setup` prepares everything and adds a `voice-pair` command to your PATH. When the
-plugin gets an update, the next `voice-pair` start sets up the new version by itself.
+Setup gets everything ready and adds a `voice-pair` command to your PATH. When the plugin
+updates, the next `voice-pair` start sets up the new version by itself.
 
-With the plugin installed, every Claude Code session starts a small voice-pair process. It does
-nothing (no microphone, no tools) unless you started the session with `voice-pair`.
-
-### From a git clone
+**From a git clone.**
 
 ```bash
 git clone https://github.com/rezaiyan/voice-pair.git ~/voice-pair
-ln -s ~/voice-pair/bin/voice-pair /opt/homebrew/bin/voice-pair
+ln -s ~/voice-pair/bin/voice-pair /opt/homebrew/bin/voice-pair   # or any folder on your PATH
 voice-pair setup
 ```
 
-The second line puts the `voice-pair` command on your PATH. You can link it into any other folder
-on your PATH instead.
-
-### What setup does
-
-Setup creates a Python environment, installs the Bun packages and downloads the speech models
-(about 2.7 GB, so the first run takes a few minutes). It checks every model file against a fixed
-SHA-256 hash. A warning from Hugging Face about `HF_TOKEN` during the download is normal. You only
-need to run setup once.
+Setup creates a Python environment, installs the Bun packages and downloads the speech models.
+The download is about 2.7 GB, so the first run takes a few minutes. Every model file is checked
+against a fixed SHA-256 hash. A Hugging Face warning about `HF_TOKEN` is normal. You only run
+setup once.
 
 Then test your microphone:
 
@@ -72,64 +57,68 @@ Then test your microphone:
 voice-pair check
 ```
 
-macOS will ask if your terminal app may use the microphone. Say yes. The check records one sentence,
-shows what it heard, and reads it back to you. You need to do this once for each terminal app you
-use (Terminal, iTerm, Ghostty and so on).
+When macOS asks if your terminal may use the microphone, say yes. The check records one sentence,
+shows what it heard and reads it back. Do this once for each terminal app you use (Terminal,
+iTerm, Ghostty and so on).
 
-## Use it with Claude Code
+## Use it
 
-### Start Claude with voice
+### Start a session
 
-Run `voice-pair` where you would normally run `claude`. It starts Claude Code for you, with voice
-turned on:
+Run `voice-pair` where you would normally run `claude`. Any `claude` option works:
 
 ```bash
 cd ~/code/my-app
-voice-pair                      # instead of: claude
-voice-pair --model opus         # any claude option works
-voice-pair --continue           # for example, continue your last conversation
+voice-pair
+voice-pair --model opus
+voice-pair --continue
 ```
 
-Claude Code first shows a warning about development channels. This is normal for voice-pair.
-Choose "I am using this for local development" and press Enter. After about three seconds the
-speech models are ready. Now you have a normal Claude Code session that also listens to you.
+Claude Code first shows a warning about development channels. Choose "I am using this for local
+development" and press Enter. You'll see it on every start: voice-pair sends your words in
+through a Claude Code channel, and Claude Code warns about every channel that isn't on
+Anthropic's approved list. About three seconds later the speech models are ready and Claude is
+listening.
 
-A plain `claude` session has no voice, even with voice-pair installed. Only sessions you start
-with `voice-pair` can hear you.
+Only sessions you start with `voice-pair` can hear you. A plain `claude` session has no voice,
+even with voice-pair installed.
 
-### Talk to Claude
+### Talk
 
-Just speak, the way you would talk to a colleague. When you stop for about 1.3 seconds, a soft tick
-plays and your words are sent. In the terminal they show up as a message from voice-pair:
+Just speak, the way you'd talk to a colleague. When you pause for about 1.3 seconds, a soft tick
+plays and your words are sent. They show up as a message from voice-pair:
 
 ```
 ← voice-pair: Why does the login test fail?
 ```
 
-Claude treats it exactly like a message you typed. It can read files, run commands and edit code
-as usual, and Claude Code still asks for your permission in the same way.
+Claude treats it like a typed message. It reads files, runs commands and edits code as usual,
+and still asks for your permission the same way.
 
-Some things you could say:
+Things you could say:
 
 - "What does this project do?"
 - "Run the tests and tell me what fails."
 - "Open the auth middleware and explain the token check."
 - "Rename this variable to user ID in the whole file."
-- "Explain more." (switches to detailed voice mode, see below)
+- "Explain more." (turns on detailed mode)
 - "Stop listening." (turns the microphone off)
+
+You can mix typing and talking. When you type, Claude answers on screen only. When you speak
+again, it talks again.
 
 ### What Claude says back
 
-Claude talks in short sentences, and the details stay on the screen:
+Claude talks in short sentences and leaves the details on screen:
 
-- For a quick question, it just says the answer.
-- For a longer task, it says what it is going to do, gives a short update when something
-  important happens, and sums up at the end.
-- Code, diffs, file paths and long lists are not read out. You see them in the terminal as usual.
+- A quick question gets a quick answer.
+- A longer task gets a short plan, an update when something important happens, and a summary at the end.
+- Code, diffs, file paths and long lists stay on screen. They aren't read out.
 - When Claude needs your permission, it tells you, and you answer with the keyboard.
 
-The microphone is off while Claude is speaking, so it doesn't hear itself. Wait until it stops,
-then talk. To make it stop early, run `voice-pair stop` in another terminal.
+The microphone is off while Claude speaks, so it doesn't hear itself. To make it stop early, run
+`voice-pair stop` in another terminal. With headphones, `VOICE_PAIR_BARGE_IN=1` lets you
+interrupt it by talking.
 
 ### The voice orb
 
@@ -141,152 +130,126 @@ A small orb in the bottom-right corner, just above the prompt, shows what the vo
 - **Claude speaking:** the bars follow Claude's actual voice.
 - **Muted:** a grey ring.
 
-It is a Claude Code mod in `band/`, and `voice-pair` loads it for that session only.
-`VOICE_PAIR_BAND=full voice-pair` shows a wider band instead: an equalizer, what is happening in
+It's a Claude Code mod in `band/`, and `voice-pair` loads it for that session only.
+`VOICE_PAIR_BAND=full voice-pair` shows a wider band instead: an equalizer, what's happening in
 words (with what Claude is saying), and Mute and Stop buttons. `VOICE_PAIR_BAND=0` turns it off.
-The orb needs a Claude Code version with mod support; older versions ignore it.
+The orb needs a Claude Code version with mod support. Older versions ignore it.
 
 ### More detail by voice
 
-By default Claude keeps its speech short and leaves the details on the screen. If you want to work
-without looking at the screen, switch to detailed mode. Just say "explain more", "talk more" or
-"I'm not looking at the screen". To go back, say "keep it short".
+If you want to work without looking at the screen, say "explain more", "talk more" or "I'm not
+looking at the screen". Say "keep it short" to go back. To start in this mode, run
+`VOICE_PAIR_DETAIL=full voice-pair`.
 
-In detailed mode Claude:
+In detailed mode Claude explains what it found and why, describes code in words ("it takes the
+user ID, looks up the session, and fails if the token expired"), tells you what it changed, reads
+out the options when it needs a decision along with the one it recommends, and gives a longer
+summary at the end. It still won't read code, long paths or command output word for word. It
+tells you what they mean instead.
 
-- explains what it found and why, step by step
-- describes code in words ("it takes the user ID, looks up the session, and fails if the token
-  expired") instead of reading symbols
-- tells you what it changed as a short list
-- says the options out loud when it needs a decision, and which one it recommends
-- reads a longer summary at the end if it finished without speaking
-
-It still doesn't read code, long paths or command output word for word. Those don't work well as
-speech, so Claude tells you what they mean instead.
-
-To start a session in detailed mode, use `VOICE_PAIR_DETAIL=full voice-pair`. `voice-pair status`
-shows the current mode.
-
-Long answers are harder to stop. If you use headphones, `VOICE_PAIR_BARGE_IN=1` lets you interrupt
-Claude by talking. Without headphones, use `voice-pair stop`.
-
-### Typing and talking
-
-You can mix both in one session. When you type a message, Claude answers on the screen only, as
-in a normal session. When you speak again, it starts talking again.
-
-### Stop the session
-
-End it like any Claude Code session: type `/exit`, or press Ctrl+C twice.
-
-### Control commands
-
-To control a running session, open a second terminal:
+### Control it from another terminal
 
 ```bash
-voice-pair stop      # stop speaking right now
-voice-pair mute      # turn the microphone off (you can also say "stop listening")
+voice-pair stop      # stop talking right now
+voice-pair mute      # turn the microphone off
 voice-pair unmute    # turn it back on
-voice-pair status    # show the current state
+voice-pair status    # show the current state and voice mode
 ```
 
-Only one voice session can run at a time.
+End the session like any Claude Code session: type `/exit` or press Ctrl+C twice. Only one voice
+session can run at a time.
 
 ## Settings
 
-Set these as environment variables before `voice-pair`, for example
-`VOICE_PAIR_SPEED=0.9 voice-pair`.
+Set these before the command, for example `VOICE_PAIR_SPEED=0.9 voice-pair`.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `VOICE_PAIR_DETAIL` | `brief` | Set to `full` to start in detailed voice mode. You can also switch by voice. |
+| `VOICE_PAIR_DETAIL` | `brief` | `full` starts in detailed mode. You can also switch by voice. |
 | `VOICE_PAIR_SPEED` | `1.0` | How fast Claude talks. Lower is slower. |
-| `VOICE_PAIR_END_SILENCE_MS` | `1300` | How long a pause (in ms) sends your message. Raise it if you get cut off. |
-| `VOICE_PAIR_VAD_LEVEL` | `2` | How strict the speech detection is, from 0 to 3. Raise it in a noisy room. |
-| `VOICE_PAIR_TTS` | `kokoro` | Set to `say` to use the built-in macOS voice. |
+| `VOICE_PAIR_END_SILENCE_MS` | `1300` | How long a pause (ms) sends your message. Raise it if you get cut off. |
+| `VOICE_PAIR_VAD_LEVEL` | `2` | How strict speech detection is, 0 to 3. Raise it in a noisy room. |
+| `VOICE_PAIR_TTS` | `kokoro` | `say` uses the built-in macOS voice. |
 | `VOICE_PAIR_VOICE` | `af_heart` | Which Kokoro voice to use. |
-| `VOICE_PAIR_SAY_VOICE` | system voice | Which macOS voice to use with `say` (see `say -v '?'`). |
-| `VOICE_PAIR_START_MUTED` | off | Set to `1` to start with the microphone off. |
-| `VOICE_PAIR_BARGE_IN` | off | Set to `1` to interrupt Claude by talking. Use headphones, or it hears itself. |
-| `VOICE_PAIR_CUES` | `1` | Set to `0` to turn off the small sound when your message is sent. |
+| `VOICE_PAIR_SAY_VOICE` | system voice | Which macOS voice `say` uses (see `say -v '?'`). |
+| `VOICE_PAIR_START_MUTED` | off | `1` starts with the microphone off. |
+| `VOICE_PAIR_BARGE_IN` | off | `1` lets you interrupt Claude by talking. Use headphones, or it hears itself. |
+| `VOICE_PAIR_CUES` | `1` | `0` turns off the tick when your message is sent. |
 | `VOICE_PAIR_BAND` | orb | `full` for the wide band with words and buttons, `0` for nothing above the prompt. |
-| `VOICE_PAIR_LOG_TRANSCRIPTS` | off | Set to `1` to save what you said in the log, for debugging. |
-| `VOICE_PAIR_ALLOW_BYPASS` | off | Set to `1` to skip the question when permission checks are off. |
+| `VOICE_PAIR_LOG_TRANSCRIPTS` | off | `1` saves what you said in the log, for debugging. |
+| `VOICE_PAIR_ALLOW_BYPASS` | off | `1` skips the question when permission checks are off. |
 | `VOICE_PAIR_PORT` | `7788` | First local port to try for the control commands. |
-| `VOICE_PAIR_CACHE` | `~/.cache/voice-pair` | Where models, the log and session files are kept. |
-| `VOICE_PAIR_STT_MODEL` | `mlx-community/parakeet-tdt-0.6b-v3` | A different Parakeet model. It is not hash-checked. |
+| `VOICE_PAIR_CACHE` | `~/.cache/voice-pair` | Where models, the log and session files live. |
+| `VOICE_PAIR_STT_MODEL` | `mlx-community/parakeet-tdt-0.6b-v3` | A different Parakeet model. It isn't hash-checked. |
 | `VOICE_PAIR_STT_REVISION` | a fixed commit | Which version of the speech model to download. |
-| `VOICE_PAIR_SIDECAR` | none | For development only: run a different audio process (the tests use a fake one). |
+| `VOICE_PAIR_SIDECAR` | none | Development only: run a different audio process (the tests use a fake one). |
 
 ## Security and privacy
 
 Please read this before you use voice-pair.
 
-**The microphone is an open door.** Everything it hears becomes a message to Claude. That
-includes a video playing in the background, a phone call, or another person in the room. Keep
-Claude Code's permission prompts turned on, so Claude has to ask before it runs commands or edits
-files. If you start voice-pair with `--dangerously-skip-permissions` or with `bypassPermissions`
-in your settings, it warns you and asks you to type `yes` first. Permission prompts are read out
-loud, but you can only approve them with the keyboard, never by voice.
+**The microphone is an open door.** Everything it hears becomes a message to Claude: a video in
+the background, a phone call, someone else in the room. Keep Claude Code's permission prompts on,
+so Claude has to ask before it runs commands or edits files. If you start voice-pair with
+`--dangerously-skip-permissions` or `bypassPermissions` in your settings, it warns you and asks
+you to type `yes` first. Permission prompts are read out loud, but you can only approve them with
+the keyboard, never by voice.
 
-**Where your words go.** Your audio stays on your Mac. After setup, voice-pair does not connect
-to the internet. But the text of what you say is sent to Claude as your message, exactly like
-typed text, and it is saved in the Claude Code session history. Claude's answers are spoken out
-loud, so people near you can hear them.
+**Where your words go.** Your audio stays on your Mac, and after setup voice-pair doesn't connect
+to the internet. The text of what you say goes to Claude as your message, just like typed text,
+and is saved in the Claude Code session history. Claude's answers are spoken out loud, so people
+near you can hear them.
 
-**The log does not keep your words.** voice-pair writes a small log to
-`~/.cache/voice-pair/voice-pair.log`. It contains timings and errors, but not what you said: each
-message is shown only as its length, like `[42 chars]`. Only your user account can read the file,
-and it is rotated at 1 MB.
+**The log doesn't keep your words.** `~/.cache/voice-pair/voice-pair.log` has timings and errors,
+not what you said. Each message shows up only as its length, like `[42 chars]`. Only your user
+account can read the file, and it rotates at 1 MB.
 
-**The control commands are protected.** `voice-pair stop`, `mute` and the other commands talk to
-the session through a port on `127.0.0.1`. Each session creates a random password for this port
-and saves it in a file that only you can read. Requests without it are refused, and so is any
-request that comes from a web page. The port cannot send messages to Claude. Only the
-microphone can do that.
+**The control commands are protected.** `voice-pair stop`, `mute` and the others talk to the
+session through a port on `127.0.0.1`. Each session makes a random password for it and saves it
+in a file only you can read. Requests without it are refused, and so is anything coming from a
+web page. The port can't send messages to Claude. Only the microphone can.
 
-**The models are checked.** `setup` downloads the voice model from a fixed kokoro-onnx release and
-the speech recognition model from a fixed Hugging Face commit. It checks each file against a
-SHA-256 hash in [`audio/models.py`](audio/models.py). If a file does not match, it is deleted and
-setup stops.
+**The models are checked.** Setup downloads the voice model from a fixed kokoro-onnx release and
+the speech model from a fixed Hugging Face commit, and checks each file against a SHA-256 hash in
+[`audio/models.py`](audio/models.py). If a file doesn't match, it's deleted and setup stops.
 
-If you find a security problem, please report it privately with GitHub's "Report a vulnerability"
-button in the Security tab, not in a public issue.
+If you find a security problem, please report it privately with GitHub's "Report a
+vulnerability" button in the Security tab, not in a public issue.
 
 ## Limits
 
-- It works only in the Claude Code terminal app. The desktop app cannot use channels yet.
-- You cannot interrupt Claude by voice while it is working. What you say is sent when it finishes.
-  `voice-pair stop` stops the speaking at once.
+- It only works in the Claude Code terminal app. The desktop app can't use channels yet.
+- You can't interrupt Claude by voice while it's working. What you say is sent when it finishes.
+  `voice-pair stop` stops the talking right away.
 - Speech recognition sometimes gets technical words wrong ("jason" instead of JSON). Claude
-  usually understands what you meant from the code.
+  usually figures out what you meant from the code.
 
 ## How it works
 
 | Part | File | What it does |
 |---|---|---|
-| Launcher | `bin/voice-pair` | Makes sure the voice server is available (the plugin ships it; a git clone registers it for your project), adds the hooks and tool permissions for this one session, and starts `claude`. |
+| Launcher | `bin/voice-pair` | Makes sure the voice server is there (the plugin ships it, a git clone registers it for your project), adds the hooks and tool permissions for this one session, and starts `claude`. |
 | Channel server | `server/index.ts` | An MCP server that sends what you said into the session and gives Claude the `speak`, `set_voice_detail` and `set_listening` tools. |
-| Turn logic | `server/state.ts` | Decides when to speak. If you asked by voice and Claude finished without speaking, it reads a short summary of the answer. |
-| Audio process | `audio/sidecar.py` | Listens to the microphone, finds where you start and stop talking (webrtcvad), turns speech into text (Parakeet), and plays Claude's voice (Kokoro). The microphone is ignored while Claude is speaking. |
+| Turn logic | `server/state.ts` | Decides when to speak. If you asked by voice and Claude finished without speaking, it reads a short summary. |
+| Audio process | `audio/sidecar.py` | Listens to the microphone, finds where you start and stop talking (webrtcvad), turns speech into text (Parakeet) and plays Claude's voice (Kokoro). It ignores the microphone while Claude talks. |
 | Hook helper | `hooks/forward.ts` | Passes Claude Code hook events to the server. |
-| Voice orb | `band/` | A Claude Code mod that reads the server's live state (what the voice is doing, and the equalizer bands of the microphone or of Claude's voice) about 25 times a second and draws the orb above the prompt. |
+| Voice orb | `band/` | A Claude Code mod that reads the server's live state (what the voice is doing, and the equalizer bands of the microphone or Claude's voice) about 25 times a second and draws the orb above the prompt. |
 
-The voice server only comes alive in a session started with `voice-pair`. In a plain `claude`
-session it does nothing: no microphone, no tools.
+With the plugin installed, every Claude Code session starts a small voice-pair server, but it
+does nothing (no microphone, no tools) unless you started the session with `voice-pair`.
 
-To remove voice-pair:
+On an M2 Max, turning 5 seconds of speech into text takes about 150 ms, and Claude's voice starts
+about 0.9 seconds after it calls `speak`.
+
+## Uninstall
 
 - Plugin: run `/plugin uninstall voice-pair@rezaiyan` in Claude Code, and delete the
-  `voice-pair` command that setup added (it tells you where).
-- Git clone: with a git clone, the launcher registers the server for each project where you use
-  it. Remove it there with `claude mcp remove voice-pair -s local`.
+  `voice-pair` command setup added (it tells you where).
+- Git clone: the launcher registers the server in each project where you use it. Remove it there
+  with `claude mcp remove voice-pair -s local`.
 
-The models stay on disk: delete `~/.cache/voice-pair` and
+The models stay on disk. Delete `~/.cache/voice-pair` and
 `~/.cache/huggingface/hub/models--mlx-community--parakeet-tdt-0.6b-v3` to get the space back.
-
-On an M2 Max, turning 5 seconds of speech into text takes about 150 ms. Claude's voice starts
-about 0.9 seconds after it calls `speak`.
 
 ## Tests
 
@@ -296,20 +259,20 @@ cd server && bun test tests
 claude plugin test band
 ```
 
-The Python tests include a real run through speech detection and Parakeet, using speech made by
-macOS `say`. The Bun tests start the real server with a fake audio process.
+The Python tests do a real run through speech detection and Parakeet, using speech made by macOS
+`say`. The Bun tests start the real server with a fake audio process.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). This repository contains only voice-pair's own code. `setup`
-installs the other packages and downloads the models, and each of them has its own license.
+MIT, see [LICENSE](LICENSE). This repository only has voice-pair's own code. Setup installs the
+other packages and downloads the models, and each has its own license.
 
-Most of them use permissive licenses (MIT, BSD, Apache-2.0, ISC). `certifi` and `tqdm` are MPL-2.0
-and `soxr` is LGPL-2.1. Two parts of the Kokoro voice are GPL-3.0 or later:
+Most use permissive licenses (MIT, BSD, Apache-2.0, ISC). `certifi` and `tqdm` are MPL-2.0 and
+`soxr` is LGPL-2.1. Two parts of the Kokoro voice are GPL-3.0 or later:
 [phonemizer](https://github.com/bootphon/phonemizer) and the
-[espeak-ng](https://github.com/espeak-ng/espeak-ng) library inside `espeakng-loader`. This does
-not matter for using or forking voice-pair. But if you share a package that includes them, such
-as a bundled app, the GPL applies to that package. With `VOICE_PAIR_TTS=say` they are not used.
+[espeak-ng](https://github.com/espeak-ng/espeak-ng) library inside `espeakng-loader`. That doesn't
+matter for using or forking voice-pair. But if you share a package that includes them, like a
+bundled app, the GPL applies to that package. With `VOICE_PAIR_TTS=say` they aren't used.
 
 ## Credits
 
@@ -320,7 +283,6 @@ as a bundled app, the GPL applies to that package. With `VOICE_PAIR_TTS=say` the
   [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx).
 - Speech detection: [webrtcvad](https://github.com/wiseman/py-webrtcvad) (MIT), from the
   [webrtcvad-wheels](https://github.com/daanzu/py-webrtcvad-wheels) build.
-- Claude Code connection: [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-  (MIT).
+- Claude Code connection: [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) (MIT).
 
-The models are not part of this repository. `voice-pair setup` downloads them.
+The models aren't part of this repository. `voice-pair setup` downloads them.
