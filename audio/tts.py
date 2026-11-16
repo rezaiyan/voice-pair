@@ -27,6 +27,8 @@ class Speaker:
         self._say_proc: subprocess.Popen | None = None
         self._speaking = False
         self._kokoro = None
+        # (samples, sample_rate, monotonic start) of the Kokoro audio playing now, for the band.
+        self.now_playing: tuple[object, int, float] | None = None
         self.engine = engine
         if engine == "kokoro":
             try:
@@ -120,5 +122,9 @@ class Speaker:
                 return
             samples, sr = pending
             self._sd.play(samples, sr)
-            pending = self._synth(parts[i + 1]) if i + 1 < len(parts) else None
-            self._sd.wait()
+            self.now_playing = (samples, sr, time.monotonic())
+            try:
+                pending = self._synth(parts[i + 1]) if i + 1 < len(parts) else None
+                self._sd.wait()
+            finally:
+                self.now_playing = None

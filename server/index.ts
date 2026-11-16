@@ -14,12 +14,14 @@ import { join } from "node:path";
 import { rejectRequest } from "./auth.ts";
 import { instructions, parseDetail, SUMMARY_CHARS } from "./instructions.ts";
 import { Sidecar, log, said, type SidecarEvent } from "./sidecar.ts";
+import { LiveState } from "./live.ts";
 import { VoiceState, type HookEvent } from "./state.ts";
 
 const AUDIO_DIR = join(import.meta.dir, "..", "audio");
 const PORT = Number(process.env.VOICE_PAIR_PORT ?? 7788);
 
 const state = new VoiceState(parseDetail(process.env.VOICE_PAIR_DETAIL));
+const live = new LiveState();
 
 const mcp = new Server(
   { name: "voice-pair", version: "0.3.1" },
@@ -43,6 +45,7 @@ function speak(text: string, summarize = false): boolean {
 }
 
 async function onSidecarEvent(ev: SidecarEvent): Promise<void> {
+  live.onEvent(ev);
   switch (ev.event) {
     case "ready":
       log(
@@ -192,6 +195,7 @@ function startHttp(port: number, token: string) {
           muted: sidecar.muted,
           voiceMode: state.voiceMode,
           detail: state.detail,
+          ...live.snapshot(sidecar),
         });
       }
       if (req.method !== "POST")

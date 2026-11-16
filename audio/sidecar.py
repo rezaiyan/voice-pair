@@ -2,7 +2,10 @@
 
 Spawned by the channel server. Talks JSON lines:
   stdin  <- {"cmd": "speak", "text": str, "summarize": bool, "max_chars": int} | {"cmd": "stop"|"mute"|"unmute"|"shutdown"}
-  stdout -> {"event": "ready"|"hearing"|"transcript"|"dropped"|"speaking"|"muted"|"error", ...}
+  stdout -> {"event": "ready"|"hearing"|"transcribing"|"transcript"|"dropped"|"speaking"|"muted"|"level"|"error", ...}
+  ("level" is the mic loudness 0..1, a few times a second; "bands" the equalizer bands 0..1 of the
+   mic ("source": "mic", every frame) or of Claude's voice while it plays ("source": "voice"),
+   both for the live voice band.)
 Diagnostics go to stderr.
 """
 
@@ -19,6 +22,7 @@ import time
 import config
 import models
 import speech_text
+from level import LevelMeter, Spectrum
 from segmenter import Segmenter
 
 FILLERS = {"uh", "um", "hm", "hmm", "mm", "mhm", "ah", "er", "oh", "huh"}
@@ -65,6 +69,9 @@ class Sidecar:
         t0 = time.monotonic()
         self.vad = webrtcvad.Vad(config.VAD_AGGRESSIVENESS)
         self.seg = Segmenter.from_config()
+        self.meter = LevelMeter()
+        self.mic_bands = Spectrum(config.SAMPLE_RATE, agc=True)
+        self._mic_quiet = True  # the mic's bands were last sent as all zero
         self.stt = Transcriber(models.stt_dir(), config.SAMPLE_RATE)
         self.speaker = Speaker(config.TTS_ENGINE, on_state=self._on_speaking, log=log)
         log(f"models loaded in {time.monotonic() - t0:.1f}s (tts={self.speaker.engine})")
@@ -104,7 +111,18 @@ class Sidecar:
         if self.muted or (self.speaker.speaking and not self.barge_in):
             if self.seg.active:
                 self.seg.reset()
+            if (quiet := self.meter.silence()) is not None:
+                emit("level", value=quiet)
+            if not self._mic_quiet:
+                self._mic_quiet = True
+                emit("bands", source="mic", values=[0.0] * self.mic_bands.count)
             return
+        if (level := self.meter.push(frame)) is not None:
+            emit("level", value=level)
+        bands = self.mic_bands.frame(frame)
+        if any(bands) or not self._mic_quiet:
+            emit("bands", source="mic", values=bands)
+        self._mic_quiet = not any(bands)
         event, audio = self.seg.push(frame, self.vad.is_speech(frame, config.SAMPLE_RATE))
         if event == "start":
             if self.speaker.speaking and self.barge_in:
@@ -113,6 +131,7 @@ class Sidecar:
         elif event == "drop":
             emit("dropped", reason="too short")
         elif event == "end":
+            emit("transcribing")
             self._utterances.put((audio, time.monotonic()))
 
     # -- utterance -> text ----------------------------------------------------------------------
@@ -135,6 +154,26 @@ class Sidecar:
                 continue
             self._cue()
             emit("transcript", text=text, stt_ms=ms, audio_ms=len(pcm) // 32)
+
+    # -- Claude's voice -> equalizer bands --------------------------------------------------------
+    def _voice_bands_loop(self) -> None:
+        """While Kokoro plays, send the bands of the audio at the playback position, every 30 ms."""
+        spectra: dict[int, Spectrum] = {}
+        was_playing = False
+        while self._running.is_set():
+            time.sleep(config.FRAME_MS / 1000)
+            playing = self.speaker.now_playing
+            if playing is None:
+                if was_playing:
+                    was_playing = False
+                    emit("bands", source="voice", values=[0.0] * self.mic_bands.count)
+                continue
+            samples, sr, started = playing
+            spec = spectra.setdefault(sr, Spectrum(sr))
+            pos = int((time.monotonic() - started) * sr)
+            if 0 < pos <= len(samples):
+                was_playing = True
+                emit("bands", source="voice", values=spec.bands(samples[max(0, pos - spec.n) : pos]))
 
     # -- commands from the channel server -------------------------------------------------------
     def handle(self, msg: dict) -> bool:
@@ -159,6 +198,7 @@ class Sidecar:
     def run(self) -> None:
         threading.Thread(target=self._vad_loop, name="vad", daemon=True).start()
         threading.Thread(target=self._stt_loop, name="stt", daemon=True).start()
+        threading.Thread(target=self._voice_bands_loop, name="voice-bands", daemon=True).start()
         blocksize = config.SAMPLE_RATE * config.FRAME_MS // 1000
         with self._sd.RawInputStream(
             samplerate=config.SAMPLE_RATE, channels=1, dtype="int16", blocksize=blocksize, callback=self._mic_callback
