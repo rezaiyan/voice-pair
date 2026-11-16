@@ -95,15 +95,6 @@ plays and your words are sent. They show up as a message from voice-pair:
 Claude treats it like a typed message. It reads files, runs commands and edits code as usual,
 and still asks for your permission the same way.
 
-Things you could say:
-
-- "What does this project do?"
-- "Run the tests and tell me what fails."
-- "Open the auth middleware and explain the token check."
-- "Rename this variable to user ID in the whole file."
-- "Explain more." (turns on detailed mode)
-- "Stop listening." (turns the microphone off)
-
 You can mix typing and talking. When you type, Claude answers on screen only. When you speak
 again, it talks again.
 
@@ -120,38 +111,11 @@ The microphone is off while Claude speaks, so it doesn't hear itself. To make it
 `voice-pair stop` in another terminal. With headphones, `VOICE_PAIR_BARGE_IN=1` lets you
 interrupt it by talking.
 
-### The voice orb
-
-A small orb in the bottom-right corner, just above the prompt, shows what the voice is doing:
-
-- **Listening:** cream ticks breathe around a cream dot.
-- **You talking:** the bars follow your voice, one bar per frequency band of the microphone.
-- **Claude working:** a coral light runs round the ring.
-- **Claude speaking:** the bars follow Claude's actual voice.
-- **Muted:** a grey ring.
-
-It's a Claude Code mod in `band/`, and `voice-pair` loads it for that session only.
-`VOICE_PAIR_BAND=full voice-pair` shows a wider band instead: an equalizer, what's happening in
-words (with what Claude is saying), and Mute and Stop buttons. `VOICE_PAIR_BAND=0` turns it off.
-The orb needs a Claude Code version with mod support. Older versions ignore it.
-
-### More detail by voice
-
-If you want to work without looking at the screen, say "explain more", "talk more" or "I'm not
-looking at the screen". Say "keep it short" to go back. To start in this mode, run
-`VOICE_PAIR_DETAIL=full voice-pair`.
-
-In detailed mode Claude explains what it found and why, describes code in words ("it takes the
-user ID, looks up the session, and fails if the token expired"), tells you what it changed, reads
-out the options when it needs a decision along with the one it recommends, and gives a longer
-summary at the end. It still won't read code, long paths or command output word for word. It
-tells you what they mean instead.
-
 ### Control it from another terminal
 
 ```bash
 voice-pair stop      # stop talking right now
-voice-pair mute      # turn the microphone off
+voice-pair mute      # turn the microphone off (or say "stop listening")
 voice-pair unmute    # turn it back on
 voice-pair status    # show the current state and voice mode
 ```
@@ -165,7 +129,7 @@ Set these before the command, for example `VOICE_PAIR_SPEED=0.9 voice-pair`.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `VOICE_PAIR_DETAIL` | `brief` | `full` starts in detailed mode. You can also switch by voice. |
+| `VOICE_PAIR_DETAIL` | `brief` | `full` makes Claude explain more by voice. You can also say "explain more" or "keep it short". |
 | `VOICE_PAIR_SPEED` | `1.0` | How fast Claude talks. Lower is slower. |
 | `VOICE_PAIR_END_SILENCE_MS` | `1300` | How long a pause (ms) sends your message. Raise it if you get cut off. |
 | `VOICE_PAIR_VAD_LEVEL` | `2` | How strict speech detection is, 0 to 3. Raise it in a noisy room. |
@@ -250,17 +214,6 @@ about 0.9 seconds after it calls `speak`.
 
 The models stay on disk. Delete `~/.cache/voice-pair` and
 `~/.cache/huggingface/hub/models--mlx-community--parakeet-tdt-0.6b-v3` to get the space back.
-
-## Tests
-
-```bash
-cd audio && uv run pytest -q
-cd server && bun test tests
-claude plugin test band
-```
-
-The Python tests do a real run through speech detection and Parakeet, using speech made by macOS
-`say`. The Bun tests start the real server with a fake audio process.
 
 ## License
 
