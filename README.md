@@ -120,6 +120,21 @@ The microphone is off while Claude speaks, so it doesn't hear itself. To make it
 `voice-pair stop` in another terminal. With headphones, `VOICE_PAIR_BARGE_IN=1` lets you
 interrupt it by talking.
 
+### The voice orb
+
+A small orb in the bottom-right corner, just above the prompt, shows what the voice is doing:
+
+- **Listening:** cream ticks breathe around a cream dot.
+- **You talking:** the bars follow your voice, one bar per frequency band of the microphone.
+- **Claude working:** a coral light runs round the ring.
+- **Claude speaking:** the bars follow Claude's actual voice.
+- **Muted:** a grey ring.
+
+It's a Claude Code mod in `band/`, and `voice-pair` loads it for that session only.
+`VOICE_PAIR_BAND=full voice-pair` shows a wider band instead: an equalizer, what's happening in
+words (with what Claude is saying), and Mute and Stop buttons. `VOICE_PAIR_BAND=0` turns it off.
+The orb needs a Claude Code version with mod support. Older versions ignore it.
+
 ### More detail by voice
 
 If you want to work without looking at the screen, say "explain more", "talk more" or "I'm not
@@ -160,6 +175,7 @@ Set these before the command, for example `VOICE_PAIR_SPEED=0.9 voice-pair`.
 | `VOICE_PAIR_START_MUTED` | off | `1` starts with the microphone off. |
 | `VOICE_PAIR_BARGE_IN` | off | `1` lets you interrupt Claude by talking. Use headphones, or it hears itself. |
 | `VOICE_PAIR_CUES` | `1` | `0` turns off the tick when your message is sent. |
+| `VOICE_PAIR_BAND` | orb | `full` for the wide band with words and buttons, `0` for nothing above the prompt. |
 | `VOICE_PAIR_LOG_TRANSCRIPTS` | off | `1` saves what you said in the log, for debugging. |
 | `VOICE_PAIR_ALLOW_BYPASS` | off | `1` skips the question when permission checks are off. |
 | `VOICE_PAIR_PORT` | `7788` | First local port to try for the control commands. |
@@ -217,6 +233,7 @@ vulnerability" button in the Security tab, not in a public issue.
 | Turn logic | `server/state.ts` | Decides when to speak. If you asked by voice and Claude finished without speaking, it reads a short summary. |
 | Audio process | `audio/sidecar.py` | Listens to the microphone, finds where you start and stop talking (webrtcvad), turns speech into text (Parakeet) and plays Claude's voice (Kokoro). It ignores the microphone while Claude talks. |
 | Hook helper | `hooks/forward.ts` | Passes Claude Code hook events to the server. |
+| Voice orb | `band/` | A Claude Code mod that reads the server's live state (what the voice is doing, and the equalizer bands of the microphone or Claude's voice) about 25 times a second and draws the orb above the prompt. |
 
 With the plugin installed, every Claude Code session starts a small voice-pair server, but it
 does nothing (no microphone, no tools) unless you started the session with `voice-pair`.
@@ -239,6 +256,7 @@ The models stay on disk. Delete `~/.cache/voice-pair` and
 ```bash
 cd audio && uv run pytest -q
 cd server && bun test tests
+claude plugin test band
 ```
 
 The Python tests do a real run through speech detection and Parakeet, using speech made by macOS

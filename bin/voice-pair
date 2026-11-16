@@ -12,6 +12,7 @@
 #      VOICE_PAIR_START_MUTED=1  VOICE_PAIR_END_SILENCE_MS=1300  VOICE_PAIR_PORT=7788
 #      VOICE_PAIR_DETAIL=full (explain everything by voice)  VOICE_PAIR_ALLOW_BYPASS=1
 #      VOICE_PAIR_LOG_TRANSCRIPTS=1 (keep what you said in the log)
+#      VOICE_PAIR_BAND=0 (no voice orb above the prompt) | full (equalizer band with words and buttons)
 set -euo pipefail
 
 src="${BASH_SOURCE[0]}"
@@ -92,7 +93,7 @@ case "${1:-}" in
   link) link; exit ;;
   check) cd "$ROOT/audio" && exec .venv/bin/python check.py ;;
   status|mute|unmute|stop) control "$1"; exit ;;
-  -h|--help|help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit ;;
+  -h|--help|help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit ;;
 esac
 
 need claude "install Claude Code"
@@ -189,5 +190,10 @@ cleanup() {
 trap cleanup EXIT
 trap : INT  # Ctrl+C belongs to claude; keep waiting for it to exit
 
+# The voice orb above the prompt (or the full band with VOICE_PAIR_BAND=full) is a mod in band/,
+# loaded for this session only.
+BAND=()
+[ "${VOICE_PAIR_BAND:-1}" != 0 ] && [ -f "$ROOT/band/hooks/hooks.json" ] && BAND=(--plugin-dir "$ROOT/band")
+
 echo "voice-pair: starting (control port $port). First launch loads speech models (~3s); then just talk."
-claude --dangerously-load-development-channels "$CHANNEL" --settings "$SETTINGS" "$@"
+claude --dangerously-load-development-channels "$CHANNEL" --settings "$SETTINGS" ${BAND[@]+"${BAND[@]}"} "$@"

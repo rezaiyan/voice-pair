@@ -1,6 +1,6 @@
 {
   "name": "voice-pair",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Talk to Claude Code out loud: local speech recognition in, spoken replies out (Apple Silicon Macs)",
   "author": { "name": "rezaiyan" },
   "homepage": "https://github.com/rezaiyan/voice-pair",

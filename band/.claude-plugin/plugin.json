@@ -1,0 +1,6 @@
+{
+  "name": "voice-pair-band",
+  "version": "0.1.0",
+  "description": "A live, animated voice band above the prompt during a voice-pair session: waveform, what the mic and voice are doing, mute and stop",
+  "types": "./types/index.d.ts"
+}
