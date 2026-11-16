@@ -24,7 +24,7 @@ const state = new VoiceState(parseDetail(process.env.VOICE_PAIR_DETAIL));
 const live = new LiveState();
 
 const mcp = new Server(
-  { name: "voice-pair", version: "0.3.1" },
+  { name: "voice-pair", version: "0.4.0" },
   {
     capabilities: { experimental: { "claude/channel": {} }, tools: {} },
     instructions: instructions(state.detail),
@@ -244,7 +244,7 @@ if (import.meta.main && !isActive) {
   // Not started by this install's bin/voice-pair (plain `claude`, or another install's session):
   // stay an inert MCP server (no channel, no tools, no mic) until Claude Code exits.
   const idle = new Server(
-    { name: "voice-pair", version: "0.3.1" },
+    { name: "voice-pair", version: "0.4.0" },
     { capabilities: {} },
   );
   await idle.connect(new StdioServerTransport());
